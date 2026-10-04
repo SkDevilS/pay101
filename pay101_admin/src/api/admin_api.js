@@ -798,6 +798,19 @@ class AdminAPI {
     }
   }
 
+  async getMerchantTodayPayinStats() {
+    try {
+      const response = await fetch(`${API_ROOT}/payin/admin/merchant-today-stats`, {
+        method: 'GET',
+        headers: this.getHeaders(true),
+      });
+      return await this.handleResponse(response);
+    } catch (error) {
+      console.error('Get merchant today payin stats error:', error);
+      throw error;
+    }
+  }
+
   // Payout APIs
   async personalPayout(payoutData) {
     try {
@@ -1411,6 +1424,24 @@ class AdminAPI {
       return await this.handleResponse(response);
     } catch (error) {
       console.error('Search transaction error:', error);
+      throw error;
+    }
+  }
+
+  // Bulk Search transactions by a list of IDs
+  async searchTransactionsByBulkIds(searchQueries, transactionType) {
+    try {
+      const response = await fetch(`${API_ROOT}/admin/reconciliation/bulk-search-ids`, {
+        method: 'POST',
+        headers: this.getHeaders(true),
+        body: JSON.stringify({
+          search_queries: searchQueries,
+          transaction_type: transactionType
+        }),
+      });
+      return await this.handleResponse(response);
+    } catch (error) {
+      console.error('Bulk search transactions error:', error);
       throw error;
     }
   }

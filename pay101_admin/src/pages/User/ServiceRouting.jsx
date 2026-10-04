@@ -260,7 +260,7 @@ export default function ServiceRouting() {
                     <p className="text-gray-500 text-sm">No payment gateways available</p>
                   ) : (
                     pgPartners
-                      .filter(gateway => gateway.supports.includes('PAYIN'))
+                      .filter(gateway => gateway.supports.includes('PAYIN') && gateway.id === 'SERVER DOWN')
                       .map((gateway) => (
                         <div key={gateway.id} className="flex items-center space-x-2">
                           <input

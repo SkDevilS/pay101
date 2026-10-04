@@ -30,6 +30,7 @@ export default function PayinReport() {
   const [toDate, setToDate] = useState('');
   const [selectedTxn, setSelectedTxn] = useState(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [pagination, setPagination] = useState({
     page: 1,
     limit: 50,
@@ -39,7 +40,7 @@ export default function PayinReport() {
 
   useEffect(() => {
     fetchTransactions();
-  }, [pagination.page, statusFilter, searchTerm, fromDate, toDate]);
+  }, [pagination.page]);
 
   const fetchTransactions = async () => {
     try {
@@ -131,31 +132,94 @@ export default function PayinReport() {
     setPagination(prev => ({ ...prev, page: 1 }));
   };
 
-  const exportToCSV = () => {
-    const headers = ['Transaction ID', 'Order ID', 'Amount', 'Charge', 'Net Amount', 'Status', 'Payment Mode', 'Date'];
-    const rows = filteredTransactions.map(txn => [
-      txn.txn_id,
-      txn.order_id,
-      txn.amount,
-      txn.charge_amount,
-      txn.net_amount,
-      txn.status,
-      txn.payment_mode || '-',
-      formatDate(txn.created_at)
-    ]);
+  const exportToCSV = async (type = 'current') => {
+    try {
+      setDownloading(true);
+      let data = [];
 
-    const csvContent = [
-      headers.join(','),
-      ...rows.map(row => row.join(','))
-    ].join('\n');
+      if (type === 'all') {
+        const params = {};
+        if (statusFilter) params.status = statusFilter;
+        if (searchTerm) params.search = searchTerm;
+        if (fromDate) params.from_date = fromDate;
+        if (toDate) params.to_date = toDate;
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `payin-report-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
+        const response = await clientAPI.getAllPayinTransactions(params);
+        if (response.success) {
+          data = response.transactions || response.data || [];
+        }
+      } else if (type === 'today') {
+        const response = await clientAPI.getTodayPayinTransactions();
+        if (response.success) {
+          data = response.transactions || response.data || [];
+        }
+      } else if (type === 'filtered') {
+        const hasFilters = statusFilter || searchTerm || fromDate || toDate;
+        
+        if (!hasFilters) {
+          toast.info('No filters applied. Use "Export All" to download all transactions.');
+          setDownloading(false);
+          return;
+        }
+
+        const params = {};
+        if (statusFilter) params.status = statusFilter;
+        if (searchTerm) params.search = searchTerm;
+        if (fromDate) params.from_date = fromDate;
+        if (toDate) params.to_date = toDate;
+
+        const response = await clientAPI.getAllPayinTransactions(params);
+        if (response.success) {
+          data = response.transactions || response.data || [];
+        }
+      } else {
+        data = filteredTransactions;
+      }
+
+      if (!data || data.length === 0) {
+        toast.info('No transactions to export');
+        return;
+      }
+
+      const headers = ['Transaction ID', 'Order ID', 'Amount', 'Charge', 'Net Amount', 'Status', 'Payment Mode', 'Date'];
+      const rows = data.map(txn => [
+        txn.txn_id,
+        txn.order_id,
+        txn.amount,
+        txn.charge_amount,
+        txn.net_amount,
+        txn.status,
+        txn.payment_mode || '-',
+        formatDate(txn.created_at)
+      ]);
+
+      const csvContent = [
+        headers.join(','),
+        ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+      ].join('\n');
+
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const filename = type === 'today' 
+        ? `payin-report-today-${new Date().toISOString().split('T')[0]}.csv`
+        : type === 'all'
+        ? `payin-report-all-${new Date().toISOString().split('T')[0]}.csv`
+        : type === 'filtered'
+        ? `payin-report-filtered-${new Date().toISOString().split('T')[0]}.csv`
+        : `payin-report-${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      
+      toast.success(`Exported ${data.length} transactions`);
+    } catch (error) {
+      toast.error('Failed to export data');
+      console.error(error);
+    } finally {
+      setDownloading(false);
+    }
   };
 
   if (loading && transactions.length === 0) {
@@ -176,13 +240,46 @@ export default function PayinReport() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={fetchTransactions}>
-            <RefreshCw className="w-4 h-4 mr-2" />
+          <Button
+            onClick={fetchTransactions}
+            disabled={loading}
+            variant="outline"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </Button>
-          <Button onClick={exportToCSV}>
-            <Download className="w-4 h-4 mr-2" />
-            Export CSV
+          <Button
+            onClick={() => exportToCSV('current')}
+            disabled={downloading}
+            className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export Page
+          </Button>
+          <Button
+            onClick={() => exportToCSV('filtered')}
+            disabled={downloading || (!statusFilter && !searchTerm && !fromDate && !toDate)}
+            variant="outline"
+            className="bg-blue-50 hover:bg-blue-100 border-blue-200 disabled:opacity-50 text-blue-700"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Download Filtered
+          </Button>
+          <Button
+            onClick={() => exportToCSV('all')}
+            disabled={downloading}
+            className="bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Export All
+          </Button>
+          <Button
+            onClick={() => exportToCSV('today')}
+            disabled={downloading}
+            className="bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
+          >
+            <Download className="h-4 w-4 mr-2" />
+            Today's Report
           </Button>
         </div>
       </div>
@@ -221,26 +318,28 @@ export default function PayinReport() {
         </Card>
       </div>
 
-      {/* Filters */}
+      {/* Search Filters */}
       <Card>
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
+        <CardHeader>
+          <CardTitle>Search Filters</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-12 gap-4 items-end">
+            <div className="col-span-3">
+              <label className="text-sm font-medium mb-1 block">Search</label>
               <Input
                 placeholder="Search by TXN ID, Order ID, Mobile..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full"
+                className="h-9"
               />
             </div>
-            <div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1 block">Status</label>
               <select
-                className="w-full border rounded-md p-2"
                 value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPagination(prev => ({ ...prev, page: 1 }));
-                }}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">All Status</option>
                 <option value="SUCCESS">Success</option>
@@ -249,6 +348,55 @@ export default function PayinReport() {
                 <option value="FAILED">Failed</option>
                 <option value="CANCELLED">Cancelled</option>
               </select>
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1 block">From Date</label>
+              <Input
+                type="date"
+                value={fromDate}
+                onChange={(e) => setFromDate(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div className="col-span-2">
+              <label className="text-sm font-medium mb-1 block">To Date</label>
+              <Input
+                type="date"
+                value={toDate}
+                onChange={(e) => setToDate(e.target.value)}
+                className="h-9"
+              />
+            </div>
+            <div className="col-span-2">
+              <Button 
+                onClick={() => {
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  fetchTransactions();
+                  toast.success('Search applied successfully!');
+                }}
+                disabled={loading}
+                className="w-full h-9 bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white"
+              >
+                Search
+              </Button>
+            </div>
+            <div className="col-span-1">
+              <Button 
+                onClick={() => {
+                  setSearchTerm('');
+                  setStatusFilter('');
+                  setFromDate('');
+                  setToDate('');
+                  setPagination(prev => ({ ...prev, page: 1 }));
+                  setTimeout(() => fetchTransactions(), 0);
+                  toast.info('Filters reset');
+                }}
+                disabled={loading}
+                variant="outline"
+                className="w-full h-9"
+              >
+                Reset
+              </Button>
             </div>
           </div>
         </CardContent>

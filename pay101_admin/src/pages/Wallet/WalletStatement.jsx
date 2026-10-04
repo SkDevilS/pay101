@@ -401,10 +401,10 @@ export default function WalletStatement() {
             </div>
 
             {/* Table */}
-            <div className="overflow-x-auto border rounded-lg">
+            <div className="overflow-x-auto border rounded-lg w-full pb-4 max-w-full">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-gray-50">
+                  <TableRow className="bg-gray-50 whitespace-nowrap">
                     <TableHead className="font-semibold">TRANSACTION ID</TableHead>
                     <TableHead className="font-semibold">CATEGORY</TableHead>
                     <TableHead className="font-semibold">TYPE</TableHead>
@@ -432,7 +432,7 @@ export default function WalletStatement() {
                     </TableRow>
                   ) : (
                     currentTransactions.map((txn) => (
-                      <TableRow key={txn.id} className="hover:bg-gray-50">
+                      <TableRow key={txn.id} className="hover:bg-gray-50 whitespace-nowrap">
                         <TableCell className="font-mono text-xs">{txn.txn_id}</TableCell>
                         <TableCell>
                           <span className={`px-2 py-1 rounded text-xs font-medium ${

@@ -17,6 +17,7 @@ import {
 } from '../../components/ui/table';
 import { Search, AlertTriangle, CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import TransactionSearch from './TransactionSearch';
+import BulkIdSearch from './BulkIdSearch';
 
 // Helper function to format PG Partner names for display
 const formatPGPartnerName = (pgPartner) => {
@@ -263,20 +264,28 @@ export default function ManualReconciliation() {
           variant={viewMode === 'bulk' ? 'default' : 'outline'}
           onClick={() => setViewMode('bulk')}
         >
-          Bulk Processing
+          Date Range Bulk
+        </Button>
+        <Button
+          variant={viewMode === 'bulk_ids' ? 'default' : 'outline'}
+          onClick={() => setViewMode('bulk_ids')}
+        >
+          Bulk Paste IDs
         </Button>
         <Button
           variant={viewMode === 'search' ? 'default' : 'outline'}
           onClick={() => setViewMode('search')}
         >
           <Search className="w-4 h-4 mr-2" />
-          Search & Update
+          Single Search
         </Button>
       </div>
 
       {/* Render based on view mode */}
       {viewMode === 'search' ? (
         <TransactionSearch />
+      ) : viewMode === 'bulk_ids' ? (
+        <BulkIdSearch />
       ) : (
         <>
           {/* Progress Bar */}
@@ -532,10 +541,10 @@ export default function ManualReconciliation() {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div className="overflow-x-auto w-full pb-4">
               <Table>
                 <TableHeader>
-                  <TableRow>
+                  <TableRow className="whitespace-nowrap">
                     <TableHead className="w-12">
                       <Checkbox
                         checked={selectedTxns.length === transactions.length && transactions.length > 0}
@@ -555,7 +564,7 @@ export default function ManualReconciliation() {
                 </TableHeader>
                 <TableBody>
                   {transactions.map((txn) => (
-                    <TableRow key={txn.id}>
+                    <TableRow key={txn.id} className="whitespace-nowrap">
                       <TableCell>
                         <Checkbox
                           checked={selectedTxns.includes(txn.txn_id)}
@@ -575,7 +584,7 @@ export default function ManualReconciliation() {
                           <div className="text-gray-500">{txn.ifsc_code}</div>
                         </TableCell>
                       )}
-                      <TableCell className="font-semibold">{formatAmount(txn.amount)}</TableCell>
+                      <TableCell className="font-semibold text-base min-w-[120px] truncate" title={formatAmount(txn.amount)}>{formatAmount(txn.amount)}</TableCell>
                       <TableCell>{getStatusBadge(txn.status)}</TableCell>
                       <TableCell>{formatPGPartnerName(txn.pg_partner)}</TableCell>
                       <TableCell>

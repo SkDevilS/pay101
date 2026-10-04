@@ -2,9 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent } from '@/components/ui/card'
-import { Lock, User, ArrowRight, Shield, Zap, Clock } from 'lucide-react'
+import { Lock, Mail, Eye, EyeOff, Shield, BarChart3, Users, Zap } from 'lucide-react'
 import { toast } from 'sonner'
 import adminAPI from '@/api/admin_api'
 import { usePageTitle } from '@/hooks/usePageTitle'
@@ -17,6 +16,7 @@ export default function Login() {
     password: ''
   })
   const [loading, setLoading] = useState(false)
+  const [showPassword, setShowPassword] = useState(false)
 
   const handleLogin = async (e) => {
     e.preventDefault()
@@ -34,11 +34,11 @@ export default function Login() {
       )
 
       if (response.success) {
-        toast.success('Login successful! Welcome back.')
+        toast.success('Welcome back!')
         navigate('/')
       }
     } catch (error) {
-      toast.error(error.message || 'Login failed. Please try again.')
+      toast.error(error.message || 'Login failed')
       setCredentials({ ...credentials, password: '' })
     } finally {
       setLoading(false)
@@ -46,170 +46,194 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
-      {/* Animated Background Elements */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-blue-400/20 to-purple-400/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-br from-indigo-400/20 to-pink-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-gradient-to-br from-purple-400/10 to-blue-400/10 rounded-full blur-3xl animate-pulse delay-500"></div>
-      </div>
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-900 via-blue-900 to-indigo-900">
+      {/* Animated grid background */}
+      <div className="absolute inset-0 bg-[linear-gradient(to_right,#4f4f4f12_1px,transparent_1px),linear-gradient(to_bottom,#4f4f4f12_1px,transparent_1px)] bg-[size:14px_24px]"></div>
+      
+      {/* Glow effects */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-blue-500/20 rounded-full blur-3xl"></div>
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-500/20 rounded-full blur-3xl"></div>
 
-      <div className="relative z-10 w-full max-w-6xl mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-center">
-          {/* Left Side - Branding & Features */}
-          <div className="hidden lg:flex flex-col space-y-8">
-            {/* Logo & Title */}
-            <div className="space-y-4">
-              <img src="/pay101.png" alt="Pay101" className="h-16 w-auto" />
-              <h1 className="text-5xl font-bold text-gray-900 leading-tight">
-                Welcome to<br />
-                <span className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 bg-clip-text text-transparent">
-                  Pay101 Admin
-                </span>
-              </h1>
-              <p className="text-xl text-gray-600">
-                Powerful payment gateway management at your fingertips
-              </p>
+      {/* Left Side - Information */}
+      <div className="hidden lg:flex lg:w-1/2 relative z-10 flex-col justify-center p-8">
+        <div className="max-w-lg">
+          {/* Logo with white background container */}
+          <div className="mb-6 inline-block bg-white px-5 py-2.5 rounded-xl shadow-lg">
+            <img src="/pay101.png" alt="Pay101" className="h-10" />
+          </div>
+
+          {/* Main Heading */}
+          <div className="mb-8">
+            <h1 className="text-4xl font-bold text-white mb-3 leading-tight">
+              Admin Control Center
+            </h1>
+            <p className="text-lg text-blue-200">
+              Manage your payment gateway with powerful tools
+            </p>
+          </div>
+
+          {/* Features */}
+          <div className="space-y-4">
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-blue-500/20 rounded-lg backdrop-blur-sm">
+                <BarChart3 className="h-5 w-5 text-blue-300" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold mb-0.5">Real-Time Analytics</h3>
+                <p className="text-blue-200 text-sm">Monitor transactions and performance metrics</p>
+              </div>
             </div>
 
-            {/* Feature Cards */}
-            <div className="space-y-4">
-              <div className="flex items-start gap-4 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg hover:shadow-xl transition-all">
-                <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl">
-                  <Shield className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Bank-Grade Security</h3>
-                  <p className="text-sm text-gray-600">AES-256 encryption & multi-factor authentication</p>
-                </div>
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-indigo-500/20 rounded-lg backdrop-blur-sm">
+                <Users className="h-5 w-5 text-indigo-300" />
               </div>
-
-              <div className="flex items-start gap-4 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg hover:shadow-xl transition-all">
-                <div className="p-3 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-xl">
-                  <Zap className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">Real-Time Processing</h3>
-                  <p className="text-sm text-gray-600">Instant transaction updates & notifications</p>
-                </div>
+              <div>
+                <h3 className="text-white font-semibold mb-0.5">Merchant Management</h3>
+                <p className="text-blue-200 text-sm">Complete control over merchant accounts</p>
               </div>
+            </div>
 
-              <div className="flex items-start gap-4 p-4 bg-white/60 backdrop-blur-sm rounded-2xl border border-white/20 shadow-lg hover:shadow-xl transition-all">
-                <div className="p-3 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl">
-                  <Clock className="h-6 w-6 text-white" />
-                </div>
-                <div>
-                  <h3 className="font-bold text-gray-900">24/7 Support</h3>
-                  <p className="text-sm text-gray-600">Round-the-clock assistance for your business</p>
-                </div>
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-purple-500/20 rounded-lg backdrop-blur-sm">
+                <Shield className="h-5 w-5 text-purple-300" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold mb-0.5">Bank-Grade Security</h3>
+                <p className="text-blue-200 text-sm">AES-256 encryption with fraud protection</p>
+              </div>
+            </div>
+
+            <div className="flex items-start gap-3">
+              <div className="p-2 bg-cyan-500/20 rounded-lg backdrop-blur-sm">
+                <Zap className="h-5 w-5 text-cyan-300" />
+              </div>
+              <div>
+                <h3 className="text-white font-semibold mb-0.5">Instant Settlements</h3>
+                <p className="text-blue-200 text-sm">Process payouts with lightning speed</p>
               </div>
             </div>
           </div>
 
-          {/* Right Side - Login Form */}
-          <Card className="bg-white/80 backdrop-blur-xl border-0 shadow-2xl">
-            <CardContent className="p-8 md:p-12">
-              {/* Mobile Logo */}
-              <div className="flex justify-center mb-8 lg:hidden">
-                <img src="/pay101.png" alt="Pay101" className="h-12" />
-              </div>
-
-              {/* Form Header */}
-              <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-gray-900 mb-2">Admin Sign In</h2>
-                <p className="text-gray-600">Enter your credentials to access the dashboard</p>
-              </div>
-
-              <form onSubmit={handleLogin} className="space-y-6">
-                {/* Admin ID Field */}
-                <div className="space-y-2">
-                  <Label htmlFor="adminId" className="text-gray-700 font-semibold">Admin ID</Label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <User className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                    </div>
-                    <Input
-                      id="adminId"
-                      type="text"
-                      placeholder="Enter your admin ID"
-                      value={credentials.adminId}
-                      onChange={(e) => setCredentials({ ...credentials, adminId: e.target.value })}
-                      className="pl-12 h-14 bg-gray-50 border-2 border-gray-200 focus:border-blue-500 focus:bg-white rounded-xl text-base transition-all"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-
-                {/* Password Field */}
-                <div className="space-y-2">
-                  <Label htmlFor="password" className="text-gray-700 font-semibold">Password</Label>
-                  <div className="relative group">
-                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                      <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                    </div>
-                    <Input
-                      id="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={credentials.password}
-                      onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
-                      className="pl-12 h-14 bg-gray-50 border-2 border-gray-200 focus:border-blue-500 focus:bg-white rounded-xl text-base transition-all"
-                      required
-                      disabled={loading}
-                    />
-                  </div>
-                </div>
-
-                {/* Remember Me */}
-                <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 cursor-pointer group">
-                    <input 
-                      type="checkbox" 
-                      className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 focus:ring-offset-0" 
-                      disabled={loading}
-                    />
-                    <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">Remember me</span>
-                  </label>
-                </div>
-
-                {/* Submit Button */}
-                <Button 
-                  type="submit" 
-                  disabled={loading}
-                  className="w-full h-14 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:from-blue-700 hover:via-indigo-700 hover:to-purple-700 text-white font-bold text-base rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 disabled:opacity-50 group"
-                >
-                  {loading ? (
-                    <span className="flex items-center gap-2">
-                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
-                      Signing In...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      Sign In to Dashboard
-                      <ArrowRight className="h-5 w-5 group-hover:translate-x-1 transition-transform" />
-                    </span>
-                  )}
-                </Button>
-              </form>
-
-              {/* Footer */}
-              <div className="mt-8 text-center">
-                <p className="text-sm text-gray-600">
-                  Need assistance?{' '}
-                  <a href="#" className="text-blue-600 hover:text-blue-700 font-semibold hover:underline">
-                    Contact Support
-                  </a>
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+          {/* Stats */}
+          <div className="grid grid-cols-3 gap-4 mt-8 pt-6 border-t border-white/10">
+            <div>
+              <div className="text-2xl font-bold text-white">99.9%</div>
+              <div className="text-blue-300 text-xs">Uptime</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-white">10K+</div>
+              <div className="text-blue-300 text-xs">Merchants</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-white">₹500Cr+</div>
+              <div className="text-blue-300 text-xs">Processed</div>
+            </div>
+          </div>
         </div>
+      </div>
 
-        {/* Bottom Text */}
-        <div className="text-center mt-8 text-sm text-gray-600">
-          <p>© 2026 Pay101. All rights reserved. | Secure Payment Gateway</p>
-        </div>
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 relative z-10">
+        <Card className="w-full max-w-md bg-white/95 backdrop-blur-xl border-0 shadow-2xl">
+          <CardContent className="p-8">
+            {/* Mobile Logo - Only show on mobile */}
+            <div className="flex justify-center mb-6 lg:hidden">
+              <img src="/pay101.png" alt="Pay101" className="h-10" />
+            </div>
+
+            {/* Header */}
+            <div className="text-center mb-8">
+              <h1 className="text-2xl font-bold text-gray-900 mb-1">Admin Portal</h1>
+              <p className="text-sm text-gray-500">Sign in to continue</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-5">
+              {/* Admin ID */}
+              <div>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Input
+                    type="text"
+                    placeholder="Admin ID"
+                    value={credentials.adminId}
+                    onChange={(e) => setCredentials({ ...credentials, adminId: e.target.value })}
+                    className="pl-10 h-12 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    required
+                    disabled={loading}
+                  />
+                </div>
+              </div>
+
+              {/* Password */}
+              <div>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                  <Input
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Password"
+                    value={credentials.password}
+                    onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
+                    className="pl-10 pr-10 h-12 bg-gray-50 border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+                    required
+                    disabled={loading}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Remember & Forgot */}
+              <div className="flex items-center justify-between text-sm">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input 
+                    type="checkbox" 
+                    className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" 
+                    disabled={loading}
+                  />
+                  <span className="text-gray-600">Remember</span>
+                </label>
+                <a href="#" className="text-blue-600 hover:text-blue-700 font-medium">
+                  Forgot?
+                </a>
+              </div>
+
+              {/* Submit */}
+              <Button 
+                type="submit" 
+                disabled={loading}
+                className="w-full h-12 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold shadow-lg hover:shadow-xl transition-all"
+              >
+                {loading ? (
+                  <div className="flex items-center gap-2">
+                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Signing in...
+                  </div>
+                ) : (
+                  'Sign In'
+                )}
+              </Button>
+            </form>
+
+            {/* Footer */}
+            <div className="mt-6 text-center">
+              <p className="text-xs text-gray-500">
+                Need help? <a href="#" className="text-blue-600 hover:underline font-medium">Contact Support</a>
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Bottom */}
+      <div className="absolute bottom-4 left-0 right-0 text-center z-10">
+        <p className="text-xs text-white/60">© 2026 Pay101. Secure Payment Gateway</p>
       </div>
     </div>
   )

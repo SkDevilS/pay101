@@ -562,6 +562,88 @@ def get_merchants_list():
         }), 500
 
 
+@reconciliation_bp.route('/api/admin/reconciliation/bulk-search-ids', methods=['POST'])
+@jwt_required()
+def bulk_search_ids():
+    """Search for multiple transactions by a list of txn_ids or order_ids"""
+    try:
+        admin_id = get_jwt_identity()
+        data = request.json
+        search_queries = data.get('search_queries', [])
+        transaction_type = data.get('transaction_type', 'payin')  # 'payin' or 'payout'
+        
+        # Clean and unique queries
+        search_queries = list(set([str(q).strip() for q in search_queries if str(q).strip()]))
+        
+        if not search_queries:
+            return jsonify({
+                'success': False,
+                'message': 'No valid search queries provided'
+            }), 400
+            
+        if len(search_queries) > 500:
+            return jsonify({
+                'success': False,
+                'message': 'Cannot search more than 500 IDs at once'
+            }), 400
+            
+        conn = get_db_connection()
+        
+        with conn.cursor() as cursor:
+            # Create the IN clause placeholders
+            placeholders = ', '.join(['%s'] * len(search_queries))
+            
+            if transaction_type == 'payin':
+                query = f"""
+                    SELECT 
+                        pt.id, pt.txn_id, pt.order_id, pt.merchant_id, pt.amount,
+                        pt.charge_amount, pt.net_amount, pt.status, pt.pg_partner,
+                        pt.pg_txn_id, pt.created_at, pt.completed_at, pt.callback_url,
+                        pt.remarks, pt.error_message,
+                        m.full_name as merchant_name, m.mobile as merchant_mobile
+                    FROM payin_transactions pt
+                    LEFT JOIN merchants m ON pt.merchant_id = m.merchant_id
+                    WHERE pt.txn_id IN ({placeholders}) OR pt.order_id IN ({placeholders})
+                    ORDER BY pt.created_at DESC
+                """
+                params = search_queries + search_queries
+                cursor.execute(query, params)
+                results = cursor.fetchall()
+            else:
+                query = f"""
+                    SELECT 
+                        p.id, p.txn_id, p.reference_id, p.order_id, p.merchant_id, p.amount,
+                        p.charge_amount, p.net_amount, p.status, p.bene_name, p.account_no,
+                        p.ifsc_code, p.pg_partner, p.pg_txn_id, p.utr, p.created_at,
+                        p.completed_at, p.callback_url, p.remarks, p.error_message,
+                        m.full_name as merchant_name, m.mobile as merchant_mobile
+                    FROM payout_transactions p
+                    LEFT JOIN merchants m ON p.merchant_id = m.merchant_id
+                    WHERE p.txn_id IN ({placeholders}) OR p.reference_id IN ({placeholders}) OR p.order_id IN ({placeholders})
+                    ORDER BY p.created_at DESC
+                """
+                params = search_queries + search_queries + search_queries
+                cursor.execute(query, params)
+                results = cursor.fetchall()
+                
+        conn.close()
+        
+        return jsonify({
+            'success': True,
+            'results': results,
+            'count': len(results),
+            'transaction_type': transaction_type
+        })
+        
+    except Exception as e:
+        print(f"[RECONCILIATION BULK SEARCH] Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}'
+        }), 500
+
 @reconciliation_bp.route('/api/admin/reconciliation/search', methods=['POST'])
 @jwt_required()
 def search_transaction():
@@ -597,7 +679,6 @@ def search_transaction():
                         pt.status,
                         pt.pg_partner,
                         pt.pg_txn_id,
-                        pt.utr,
                         pt.created_at,
                         pt.completed_at,
                         pt.callback_url,

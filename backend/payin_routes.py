@@ -18,7 +18,12 @@ from sabpaisa_grosmart_service import sabpaisa_grosmart_service
 from oxymoney_grosmart_service import oxymoney_grosmart_service
 from rmsjss_service import rmsjss_service
 from rmshamster_service import rmshamster_service
+from rmsapex_service import rmsapex_service
 from hdfcpaytouch_barringer_service import hdfcpaytouch_barringer_service
+from moneyone_service import moneyone_service
+from paysutra_service import paysutra_service
+from indicpay_fusioncart_service import indicpay_fusioncart_service
+from payu_apex_service import payu_apex_service
 from database import get_db_connection
 from utils import decrypt_aes, encrypt_aes, validate_api_credentials
 import json
@@ -204,9 +209,24 @@ def create_payin_order():
                     # Use RMS_MEGACART for payin
                     from rmsmegacart_service import rmsmegacart_service
                     result = rmsmegacart_service.create_payin_order(current_merchant, order_data)
+                elif pg_partner == 'RMS_APEX':
+                    # Use RMS_APEX for payin
+                    result = rmsapex_service.create_payin_order(current_merchant, order_data)
                 elif pg_partner == 'HDFCPAYTOUCH_BARRINGER':
                     # Use HDFC Paytouch_Barringer for payin
                     result = hdfcpaytouch_barringer_service.create_payin_order(current_merchant, order_data)
+                elif pg_partner == 'MONEYONE':
+                    # Use MoneyOne for payin
+                    result = moneyone_service.create_payin_order(current_merchant, order_data)
+                elif pg_partner == 'PAYSUTRA':
+                    # Use Paysutra for payin
+                    result = paysutra_service.create_payin_order(current_merchant, order_data)
+                elif pg_partner == 'PAYU_APEX':
+                    # Use PayU_Apex for payin
+                    result = payu_apex_service.create_payin_order(current_merchant, order_data)
+                elif pg_partner == 'INDICPAY_FUSIONCART':
+                    # Use Indicpay Fusioncart for payin
+                    result = indicpay_fusioncart_service.create_payin_order(current_merchant, order_data)
                 else:
                     # Use PayU for payin (default)
                     result = payu_service.create_payin_order(current_merchant, order_data)
@@ -781,6 +801,87 @@ def verify_payment():
                                 txn['status'] = new_status
                                 txn['bank_ref_no'] = utr
                     
+                    elif pg_partner == 'INDICPAY_FUSIONCART':
+                        # Check status from Indicpay Fusioncart
+                        status_result = indicpay_fusioncart_service.check_payment_status(txn['txn_id'])
+                        
+                        if status_result.get('success'):
+                            new_status = status_result.get('status', 'INITIATED')
+                            utr = status_result.get('utr')
+                            pg_txn_id = status_result.get('txnId')
+                            payment_mode = 'UPI'
+                            
+                            print(f"Indicpay Fusioncart Status Result: Status={new_status}, UTR={utr}")
+                            
+                            # Update transaction if status changed
+                            if new_status != txn['status']:
+                                if new_status == 'SUCCESS':
+                                    cursor.execute("""
+                                        UPDATE payin_transactions
+                                        SET status = %s, bank_ref_no = %s, pg_txn_id = %s, payment_mode = %s,
+                                            completed_at = NOW(), updated_at = NOW()
+                                        WHERE txn_id = %s
+                                    """, (new_status, utr, pg_txn_id, payment_mode, txn['txn_id']))
+                                    
+                                    # Check if wallet already credited (idempotency)
+                                    cursor.execute("""
+                                        SELECT COUNT(*) as count FROM merchant_wallet_transactions
+                                        WHERE reference_id = %s AND txn_type = 'UNSETTLED_CREDIT'
+                                    """, (txn['txn_id'],))
+                                    
+                                    wallet_already_credited = cursor.fetchone()['count'] > 0
+                                    
+                                    if not wallet_already_credited:
+                                        # Credit merchant unsettled wallet with net amount
+                                        from wallet_service import wallet_service as wallet_svc
+                                        wallet_result = wallet_svc.credit_unsettled_wallet(
+                                            merchant_id=current_merchant,
+                                            amount=float(txn['net_amount']),
+                                            description=f"PayIn received (Indicpay Fusioncart) - {txn['order_id']}",
+                                            reference_id=txn['txn_id']
+                                        )
+                                        
+                                        if wallet_result['success']:
+                                            print(f"✓ Merchant unsettled wallet credited: ₹{txn['net_amount']}")
+                                        else:
+                                            print(f"✗ Failed to credit merchant unsettled wallet: {wallet_result.get('message')}")
+                                        
+                                        # Credit admin unsettled wallet with charge amount
+                                        admin_wallet_result = wallet_svc.credit_admin_unsettled_wallet(
+                                            admin_id='admin',
+                                            amount=float(txn['charge_amount']),
+                                            description=f"PayIn charge (Indicpay Fusioncart) - {txn['order_id']}",
+                                            reference_id=txn['txn_id']
+                                        )
+                                        
+                                        if admin_wallet_result['success']:
+                                            print(f"✓ Admin unsettled wallet credited: ₹{txn['charge_amount']}")
+                                        else:
+                                            print(f"✗ Failed to credit admin unsettled wallet: {admin_wallet_result.get('message')}")
+                                    else:
+                                        print(f"⚠ Wallet already credited for this transaction - skipping")
+                                    
+                                elif new_status == 'FAILED':
+                                    cursor.execute("""
+                                        UPDATE payin_transactions
+                                        SET status = %s, bank_ref_no = %s, pg_txn_id = %s, payment_mode = %s,
+                                            completed_at = NOW(), updated_at = NOW()
+                                        WHERE txn_id = %s
+                                    """, (new_status, utr, pg_txn_id, payment_mode, txn['txn_id']))
+                                else:
+                                    # Still pending/initiated
+                                    cursor.execute("""
+                                        UPDATE payin_transactions
+                                        SET status = %s, bank_ref_no = %s, pg_txn_id = %s, payment_mode = %s, updated_at = NOW()
+                                        WHERE txn_id = %s
+                                    """, (new_status, utr, pg_txn_id, payment_mode, txn['txn_id']))
+                                
+                                conn.commit()
+                                
+                                # Update txn dict with new values
+                                txn['status'] = new_status
+                                txn['bank_ref_no'] = utr
+
                     elif pg_partner == 'AIRPAY_GROSMART2':
                         # Check status from Airpay Grosmart2 using order_id
                         from airpay_grosmart2_service import airpay_grosmart2_service
@@ -1468,6 +1569,12 @@ def verify_payment():
                     elif pg_partner == 'PAYU':
                         # Check status from PayU
                         status_result = payu_service.check_transaction_status(txn['txn_id'])
+                        if status_result:
+                            txn = status_result
+                    
+                    elif pg_partner == 'PAYU_APEX':
+                        # Check status from PayU_Apex
+                        status_result = payu_apex_service.check_transaction_status(txn['txn_id'])
                         if status_result:
                             txn = status_result
                 
@@ -3063,6 +3170,68 @@ def admin_get_payin_stats():
             
     except Exception as e:
         print(f"Admin get payin stats error: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'success': False, 'message': 'Internal server error'}), 500
+
+
+@payin_bp.route('/admin/merchant-today-stats', methods=['GET'])
+@jwt_required()
+def admin_get_merchant_today_stats():
+    """Get live today's payin statistics grouped by merchant (admin only)"""
+    try:
+        current_admin = get_jwt_identity()
+        
+        conn = get_db_connection()
+        if not conn:
+            return jsonify({'success': False, 'message': 'Database connection failed'}), 500
+            
+        try:
+            with conn.cursor() as cursor:
+                # Check if user is admin
+                cursor.execute("SELECT admin_id FROM admin_users WHERE admin_id = %s", (current_admin,))
+                if not cursor.fetchone():
+                    return jsonify({'success': False, 'message': 'Unauthorized'}), 403
+                    
+                # Query merchant-wise today's payin stats
+                cursor.execute("""
+                    SELECT 
+                        m.merchant_id, 
+                        m.full_name as business_name, 
+                        COUNT(pt.txn_id) as total_txns,
+                        COALESCE(SUM(pt.amount), 0) as gross_amount,
+                        COALESCE(SUM(pt.net_amount), 0) as net_amount,
+                        COALESCE(SUM(pt.charge_amount), 0) as charge_amount
+                    FROM payin_transactions pt
+                    JOIN merchants m ON pt.merchant_id = m.merchant_id
+                    WHERE pt.status = 'SUCCESS' 
+                      AND DATE(pt.created_at) = CURDATE()
+                    GROUP BY m.merchant_id, m.full_name
+                    ORDER BY gross_amount DESC
+                """)
+                
+                stats = cursor.fetchall()
+                
+                return jsonify({
+                    'success': True,
+                    'data': [
+                        {
+                            'merchant_id': stat['merchant_id'],
+                            'business_name': stat['business_name'],
+                            'total_txns': stat['total_txns'],
+                            'gross_amount': float(stat['gross_amount']),
+                            'net_amount': float(stat['net_amount']),
+                            'charge_amount': float(stat['charge_amount'])
+                        }
+                        for stat in stats
+                    ]
+                }), 200
+                
+        finally:
+            conn.close()
+            
+    except Exception as e:
+        print(f"Admin get merchant today stats error: {e}")
         import traceback
         traceback.print_exc()
         return jsonify({'success': False, 'message': 'Internal server error'}), 500

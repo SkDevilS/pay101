@@ -338,9 +338,17 @@ export default function DashboardLayout() {
         </DialogContent>
       </Dialog>
       
-      <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50">
+      <div className="flex h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-purple-50 overflow-hidden">
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
+          <div 
+            className="md:hidden fixed inset-0 bg-black/50 z-40 backdrop-blur-sm transition-opacity"
+            onClick={() => setSidebarOpen(false)}
+          />
+        )}
+
         {/* Sidebar */}
-      <aside className={`${sidebarOpen ? 'w-72' : 'w-20'} bg-white border-r border-gray-200 shadow-xl transition-all duration-300 flex flex-col`}>
+      <aside className={`${sidebarOpen ? 'translate-x-0 w-72' : '-translate-x-full w-72 md:translate-x-0 md:w-20'} fixed md:static inset-y-0 left-0 z-50 bg-white border-r border-gray-200 shadow-xl transition-all duration-300 flex flex-col h-full`}>
         {sidebarOpen ? (
           <>
             {/* Logo Section - Open */}
@@ -351,11 +359,20 @@ export default function DashboardLayout() {
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSidebarOpen(!sidebarOpen)}
-                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all rounded-xl"
+                onClick={() => setSidebarOpen(false)}
+                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all rounded-xl md:flex hidden"
                 title="Close sidebar"
               >
                 <ChevronLeft size={20} />
+              </Button>
+              {/* Mobile close button */}
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => setSidebarOpen(false)}
+                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50 transition-all rounded-xl md:hidden"
+              >
+                <X size={20} />
               </Button>
             </div>
           </>
@@ -458,12 +475,24 @@ export default function DashboardLayout() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col overflow-hidden">
+      <main className="flex-1 flex flex-col overflow-hidden relative">
         {/* Top Navigation Bar */}
-        <header className="bg-white border-b border-gray-200 shadow-sm">
-          <div className="flex items-center justify-between px-6 py-4">
+        <header className="bg-white border-b border-gray-200 shadow-sm z-30">
+          <div className="flex items-center justify-between px-4 md:px-6 py-4">
+            {/* Mobile Hamburger Menu */}
+            <div className="md:hidden mr-3">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setSidebarOpen(true)}
+                className="text-gray-600 hover:text-blue-600 hover:bg-blue-50"
+              >
+                <Menu size={24} />
+              </Button>
+            </div>
+
             {/* Search Bar */}
-            <div className="flex-1 max-w-xl">
+            <div className="flex-1 max-w-xl hidden sm:block">
               <div className="relative">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
                 <Input
@@ -544,11 +573,11 @@ export default function DashboardLayout() {
 
               {/* User Profile */}
               <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
-                <div className="text-right">
+                <div className="text-right hidden sm:block">
                   <p className="text-sm font-semibold text-gray-800">Admin User</p>
                   <p className="text-xs text-gray-500">{adminAPI.getAdminId() || 'admin@moneyone.com'}</p>
                 </div>
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-semibold shadow-md">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl flex items-center justify-center text-white font-semibold shadow-md shrink-0">
                   <User size={20} />
                 </div>
               </div>
@@ -557,10 +586,11 @@ export default function DashboardLayout() {
               <Button
                 onClick={handleLogout}
                 variant="ghost"
-                className="flex items-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl transition-all duration-200 px-4 py-2"
+                className="flex items-center gap-2 text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl transition-all duration-200 px-2 sm:px-4 py-2"
+                title="Logout"
               >
                 <LogOut size={18} />
-                <span className="font-medium text-sm">Logout</span>
+                <span className="font-medium text-sm hidden sm:inline">Logout</span>
               </Button>
             </div>
           </div>

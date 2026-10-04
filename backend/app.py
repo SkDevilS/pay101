@@ -59,6 +59,7 @@ from rang_routes import rang_bp
 from rang_callback_routes import rang_callback_bp
 from viyonapay_routes import viyonapay_bp
 from viyonapay_callback_routes import viyonapay_callback_bp
+from payu_apex_callback_routes import payu_apex_callback_bp
 from sabpaisa_grosmart_callback_routes import sabpaisa_grosmart_callback_bp
 from oxymoney_grosmart_routes import oxymoney_bp
 from oxymoney_grosmart_callback_routes import oxymoney_callback_bp
@@ -69,7 +70,11 @@ from oxymoney_barringer_callback_routes import oxymoney_barringer_callback_bp
 from rmsjss_callback_routes import rmsjss_callback_bp
 from rmshamster_callback_routes import rmshamster_callback_bp
 from rmsmegacart_callback_routes import rmsmegacart_callback_bp
+from rmsapex_callback_routes import rmsapex_callback_bp
 from hdfcpaytouch_barringer_callback_routes import hdfcpaytouch_barringer_callback_bp
+from moneyone_callback_routes import moneyone_callback_bp, moneyone_payout_callback_bp
+from paysutra_callback_routes import paysutra_callback_bp, paysutra_payout_callback_bp
+from indicpay_fusioncart_callback_routes import indicpay_fusioncart_callback_bp
 from service_routing_routes import routing_bp
 from payout_routes import payout_bp
 from payu_webhook_routes import payu_webhook_bp
@@ -101,6 +106,7 @@ app.register_blueprint(rang_bp)
 app.register_blueprint(rang_callback_bp)
 app.register_blueprint(viyonapay_bp)
 app.register_blueprint(viyonapay_callback_bp)
+app.register_blueprint(payu_apex_callback_bp)
 app.register_blueprint(sabpaisa_grosmart_callback_bp)
 app.register_blueprint(oxymoney_bp)
 app.register_blueprint(oxymoney_callback_bp)
@@ -111,7 +117,13 @@ app.register_blueprint(oxymoney_barringer_callback_bp)
 app.register_blueprint(rmsjss_callback_bp)
 app.register_blueprint(rmshamster_callback_bp)
 app.register_blueprint(rmsmegacart_callback_bp)
+app.register_blueprint(rmsapex_callback_bp)
 app.register_blueprint(hdfcpaytouch_barringer_callback_bp)
+app.register_blueprint(moneyone_callback_bp)
+app.register_blueprint(moneyone_payout_callback_bp)
+app.register_blueprint(paysutra_callback_bp)
+app.register_blueprint(paysutra_payout_callback_bp)
+app.register_blueprint(indicpay_fusioncart_callback_bp)
 app.register_blueprint(routing_bp)
 app.register_blueprint(payout_bp)
 app.register_blueprint(payu_webhook_bp)

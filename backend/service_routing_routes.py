@@ -328,69 +328,32 @@ def get_pg_partners():
                 'id': 'PayU',
                 'name': 'SERVER DOWN',
                 'supports': ['PAYIN', 'PAYOUT'],
-                'status': 'active'
+                'status': 'inactive'
             },
             {
-                'id': 'Paytouch4_Barringer',
-                'name': 'Paytouch4_Barringer',
-                'supports': ['PAYOUT'],
-                'status': 'active'
-            },
-            {
-                'id': 'PAYTOUCH2',
-                'name': 'Paytouch2_Grosmart',
-                'supports': ['PAYOUT'],
-                'status': 'active'
-            },
-            {
-                'id': 'VIYONAPAY',
-                'name': 'Viyonapay_Truaxis',
+                'id': 'RMS_APEX',
+                'name': 'RMS_APEX',
                 'supports': ['PAYIN'],
                 'status': 'active'
             },
             {
-                'id': 'VIYONAPAY_BARRINGER',
-                'name': 'Viyonapay_Barringer',
+                'id': 'MONEYONE',
+                'name': 'MoneyOne',
+                'supports': ['PAYIN', 'PAYOUT'],
+                'status': 'active'
+            },
+            {
+                'id': 'PAYU_APEX',
+                'name': 'PayU_Apex',
                 'supports': ['PAYIN'],
                 'status': 'active'
             },
             {
-                'id': 'OXYMONEY_TRUAXIS',
-                'name': 'Oxymoney_Truaxis',
-                'supports': ['PAYIN'],
-                'status': 'active'
-            },
-            {
-                'id': 'OXYMONEY_BARRINGER',
-                'name': 'Oxymoney_Barringer',
-                'supports': ['PAYIN'],
-                'status': 'active'
-            },
-            {
-                'id': 'RMS_JSS',
-                'name': 'RMS_JSS',
-                'supports': ['PAYIN'],
-                'status': 'active'
-            },
-            {
-                'id': 'RMS_HAMSTER',
-                'name': 'RMS_HAMSTER',
-                'supports': ['PAYIN'],
-                'status': 'active'
-            },
-            {
-                'id': 'RMS_MEGACART',
-                'name': 'RMS_MEGACART',
-                'supports': ['PAYIN'],
-                'status': 'active'
-            },
-            {
-                'id': 'HDFCPAYTOUCH_BARRINGER',
-                'name': 'HDFCPaytouch_Barringer',
+                'id': 'INDICPAY_FUSIONCART',
+                'name': 'Indicpay Fusioncart',
                 'supports': ['PAYIN'],
                 'status': 'active'
             }
-            # Add more PG partners here as they are integrated
         ]
         
         return jsonify({
@@ -426,7 +389,8 @@ def get_admin_payout_gateways():
                 payout_gateways = [
                     {'id': 'PAYTOUCH4_BARRINGER', 'name': 'Paytouch4_Barringer', 'priority': 1},
                     {'id': 'PAYTOUCH2', 'name': 'Paytouch2_Grosmart', 'priority': 2},
-                    {'id': 'PAYU', 'name': 'PayU (SERVER DOWN)', 'priority': 3}
+                    {'id': 'PAYU', 'name': 'PayU (SERVER DOWN)', 'priority': 3},
+                    {'id': 'MONEYONE', 'name': 'MoneyOne', 'priority': 4}
                 ]
                 
                 return jsonify({

@@ -508,10 +508,10 @@ export default function PayoutReport() {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-full pb-4 max-w-full">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="whitespace-nowrap">
                   <TableHead>Transaction ID</TableHead>
                   <TableHead>Reference ID</TableHead>
                   <TableHead>Order ID</TableHead>
@@ -537,7 +537,7 @@ export default function PayoutReport() {
                   </TableRow>
                 ) : (
                   payouts.map((payout) => (
-                    <TableRow key={payout.id}>
+                    <TableRow key={payout.id} className="whitespace-nowrap">
                       <TableCell className="font-mono text-sm">{payout.txn_id}</TableCell>
                       <TableCell className="font-mono text-sm">{payout.reference_id}</TableCell>
                       <TableCell className="font-mono text-sm">{payout.order_id || '-'}</TableCell>

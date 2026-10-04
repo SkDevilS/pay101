@@ -28,6 +28,12 @@ class Config:
     PAYU_PAYOUT_BASE_URL = os.getenv('PAYU_PAYOUT_BASE_URL', 'https://uatoneapi.payu.in')
     PAYU_PAYOUT_AUTH_URL = os.getenv('PAYU_PAYOUT_AUTH_URL', 'https://uat-accounts.payu.in')
     
+    # PayU_Apex Configuration
+    PAYU_APEX_MERCHANT_KEY = os.getenv('PAYU_APEX_MERCHANT_KEY', '')
+    PAYU_APEX_MERCHANT_SALT = os.getenv('PAYU_APEX_MERCHANT_SALT', '')
+    PAYU_APEX_BASE_URL = os.getenv('PAYU_APEX_BASE_URL', 'https://test.payu.in')
+    PAYU_APEX_TEST_MODE = os.getenv('PAYU_APEX_TEST_MODE', 'True') == 'True'
+    
     # Mudrape Configuration
     MUDRAPE_BASE_URL = os.getenv('MUDRAPE_BASE_URL', 'https://agentmudrape.com')
     MUDRAPE_API_KEY = os.getenv('MUDRAPE_API_KEY', 'pk_2580642bf7f031983a0390755ee52b9e')
@@ -182,6 +188,37 @@ class Config:
     # RMS_MEGACART Configuration
     RMSMEGACART_BASE_URL = os.getenv('RMSMEGACART_BASE_URL', 'https://rmstrade.online')
     RMSMEGACART_API_TOKEN = os.getenv('RMSMEGACART_API_TOKEN', '')
+    
+    # RMS_APEX Configuration
+    RMSAPEX_BASE_URL = os.getenv('RMSAPEX_BASE_URL', 'https://rmstrade.online')
+    RMSAPEX_API_TOKEN = os.getenv('RMSAPEX_API_TOKEN', '')
+    
+    # MONEYONE Configuration
+    MONEYONE_BASE_URL = os.getenv('MONEYONE_BASE_URL', 'https://api.moneyone.co.in')
+    MONEYONE_MERCHANT_ID = os.getenv('MONEYONE_MERCHANT_ID', '')
+    MONEYONE_PASSWORD = os.getenv('MONEYONE_PASSWORD', '')
+    MONEYONE_AUTH_KEY = os.getenv('MONEYONE_AUTH_KEY', '')
+    MONEYONE_MODULE_SECRET = os.getenv('MONEYONE_MODULE_SECRET', '')
+    MONEYONE_AES_KEY = os.getenv('MONEYONE_AES_KEY', '')
+    MONEYONE_AES_IV = os.getenv('MONEYONE_AES_IV', '')
+    MNONE_TPIN = os.getenv('MNONE_TPIN', '')
+
+    # PAYSUTRA Configuration
+    PAYSUTRA_BASE_URL = os.getenv('PAYSUTRA_BASE_URL', 'https://api.paysutra.live')
+    PAYSUTRA_MERCHANT_ID = os.getenv('PAYSUTRA_MERCHANT_ID', '')
+    PAYSUTRA_PASSWORD = os.getenv('PAYSUTRA_PASSWORD', '')
+    PAYSUTRA_AUTH_KEY = os.getenv('PAYSUTRA_AUTH_KEY', '')
+    PAYSUTRA_MODULE_SECRET = os.getenv('PAYSUTRA_MODULE_SECRET', '')
+    PAYSUTRA_AES_KEY = os.getenv('PAYSUTRA_AES_KEY', '')
+    PAYSUTRA_AES_IV = os.getenv('PAYSUTRA_AES_IV', '')
+    PYS_TPIN = os.getenv('PYS_TPIN', '')
+    
+    # Indicpay Fusioncart Configuration
+    INDICPAY_FUSIONCART_BASE_URL = os.getenv('INDICPAY_FUSIONCART_BASE_URL', 'https://api.indicpay.in')
+    INDICPAY_FUSIONCART_MERCHANT_ID = os.getenv('INDICPAY_FUSIONCART_MERCHANT_ID', '')
+    INDICPAY_FUSIONCART_SECRET_KEY = os.getenv('INDICPAY_FUSIONCART_SECRET_KEY', '')
+    INDICPAY_FUSIONCART_ENCRYPTION_KEY = os.getenv('INDICPAY_FUSIONCART_ENCRYPTION_KEY', '')
+    INDICPAY_FUSIONCART_ENCRYPTION_IV = os.getenv('INDICPAY_FUSIONCART_ENCRYPTION_IV', '')
     
     # HDFC Paytouch_Barringer Configuration (PAYIN)
     HDFC_PAYTOUCH_BARRINGER_BASE_URL = os.getenv('HDFC_PAYTOUCH_BARRINGER_BASE_URL', 'https://dashboard.shreefintechsolutions.com')

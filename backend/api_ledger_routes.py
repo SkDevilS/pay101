@@ -56,8 +56,16 @@ def get_apis():
                     api_list.append({'id': 'RMS_HAMSTER', 'name': 'RMS_HAMSTER'})
                 elif pg_partner.lower() == 'rms_megacart':
                     api_list.append({'id': 'RMS_MEGACART', 'name': 'RMS_MEGACART'})
+                elif pg_partner.lower() == 'rms_apex':
+                    api_list.append({'id': 'RMS_APEX', 'name': 'RMS_APEX'})
                 elif pg_partner.lower() == 'hdfcpaytouch_barringer':
                     api_list.append({'id': 'HDFCPaytouch_Barringer', 'name': 'HDFCPaytouch_Barringer'})
+                elif pg_partner.lower() == 'payu_apex':
+                    api_list.append({'id': 'PAYU_APEX', 'name': 'PayU_Apex'})
+                elif pg_partner.lower() == 'moneyone':
+                    api_list.append({'id': 'MoneyOne', 'name': 'MoneyOne'})
+                elif pg_partner.lower() == 'indicpay_fusioncart':
+                    api_list.append({'id': 'INDICPAY_FUSIONCART', 'name': 'Indicpay_Fusioncart'})
                 else:
                     api_list.append({'id': pg_partner, 'name': pg_partner})
                     
@@ -69,6 +77,8 @@ def get_apis():
                 # Rename: paytouch4_barringer -> Paytouch4_Barringer
                 if pg_partner.lower() == 'paytouch4_barringer':
                     api_list.append({'id': 'Paytouch4_Barringer', 'name': 'Paytouch4_Barringer'})
+                elif pg_partner.lower() == 'moneyone':
+                    api_list.append({'id': 'MoneyOne', 'name': 'MoneyOne'})
                 else:
                     api_list.append({'id': pg_partner, 'name': pg_partner})
             else:
@@ -132,6 +142,10 @@ def get_api_stats():
             db_api_name = 'Oxymoney_Truaxis'
         elif api_name == 'Oxymoney_Barringer':
             db_api_name = 'Oxymoney_Barringer'
+        elif api_name == 'PAYU_APEX':
+            db_api_name = 'PAYU_APEX'
+        elif api_name == 'MoneyOne':
+            db_api_name = 'MONEYONE'
         
         # Build WHERE condition based on API name
         # Viyonapay: txn_id starts with 'viyonapay' or 'VY_TR'
@@ -149,6 +163,12 @@ def get_api_stats():
             needs_parameter = False
         elif db_api_name == 'Oxymoney_Barringer':
             where_condition = f"(pg_partner = 'Oxymoney_Barringer' OR txn_id LIKE 'OXY_BAR_%%') AND {date_condition}"
+            needs_parameter = False
+        elif db_api_name == 'PAYU_APEX':
+            where_condition = f"(pg_partner = 'PAYU_APEX' OR txn_id LIKE 'PU_AX_%%') AND {date_condition}"
+            needs_parameter = False
+        elif db_api_name == 'MONEYONE':
+            where_condition = f"(pg_partner = 'MONEYONE' OR txn_id LIKE 'MO_%%') AND {date_condition}"
             needs_parameter = False
         else:
             where_condition = f"pg_partner = %s AND {date_condition}"
@@ -238,6 +258,10 @@ def get_merchant_wise_stats():
             db_api_name = 'Oxymoney_Truaxis'
         elif api_name == 'Oxymoney_Barringer':
             db_api_name = 'Oxymoney_Barringer'
+        elif api_name == 'PAYU_APEX':
+            db_api_name = 'PAYU_APEX'
+        elif api_name == 'MoneyOne':
+            db_api_name = 'MONEYONE'
         
         # Build WHERE condition based on API name
         if db_api_name == 'Viyonapay':
@@ -251,6 +275,12 @@ def get_merchant_wise_stats():
             needs_parameter = False
         elif db_api_name == 'Oxymoney_Barringer':
             where_condition = f"(t.pg_partner = 'Oxymoney_Barringer' OR t.txn_id LIKE 'OXY_BAR_%%') AND {date_condition}"
+            needs_parameter = False
+        elif db_api_name == 'PAYU_APEX':
+            where_condition = f"(t.pg_partner = 'PAYU_APEX' OR t.txn_id LIKE 'PU_AX_%%') AND {date_condition}"
+            needs_parameter = False
+        elif db_api_name == 'MONEYONE':
+            where_condition = f"(t.pg_partner = 'MONEYONE' OR t.txn_id LIKE 'MO_%%') AND {date_condition}"
             needs_parameter = False
         else:
             where_condition = f"t.pg_partner = %s AND {date_condition}"

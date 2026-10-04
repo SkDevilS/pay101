@@ -83,6 +83,12 @@ class WalletService:
                 wallet = cursor.fetchone()
                 
                 if not wallet:
+                    # Ensure admin user exists to satisfy foreign key constraint
+                    cursor.execute("""
+                        INSERT IGNORE INTO admin_users (admin_id, password_hash, is_active)
+                        VALUES (%s, 'system_auto', FALSE)
+                    """, (admin_id,))
+                    
                     # Create wallet
                     cursor.execute("""
                         INSERT INTO admin_wallet (admin_id, main_balance)
@@ -566,6 +572,12 @@ class WalletService:
                 wallet = cursor.fetchone()
 
                 if not wallet:
+                    # Ensure admin user exists to satisfy foreign key constraint
+                    cursor.execute("""
+                        INSERT IGNORE INTO admin_users (admin_id, password_hash, is_active)
+                        VALUES (%s, 'system_auto', FALSE)
+                    """, (admin_id,))
+                    
                     # Create wallet with unsettled_balance
                     cursor.execute("""
                         INSERT INTO admin_wallet (admin_id, main_balance, unsettled_balance)

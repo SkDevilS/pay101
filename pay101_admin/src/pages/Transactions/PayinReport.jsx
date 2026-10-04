@@ -624,10 +624,10 @@ export default function PayinReport() {
           <CardTitle>Transactions ({pagination.total})</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto w-full pb-4 max-w-full">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="whitespace-nowrap">
                   <TableHead>Transaction ID</TableHead>
                   <TableHead>Order ID</TableHead>
                   <TableHead>Merchant</TableHead>
@@ -650,7 +650,7 @@ export default function PayinReport() {
                   </TableRow>
                 ) : (
                   filteredTransactions.map((txn) => (
-                    <TableRow key={txn.id}>
+                    <TableRow key={txn.id} className="whitespace-nowrap">
                       <TableCell className="font-mono text-sm">{txn.txn_id}</TableCell>
                       <TableCell className="font-mono text-sm">{txn.order_id}</TableCell>
                       <TableCell>

@@ -1,0 +1,486 @@
+"""
+Paysutra Payment Gateway Integration Service
+Handles payin transactions through Paysutra
+"""
+
+import requests
+import json
+import base64
+import os
+from datetime import datetime
+from config import Config
+from database import get_db_connection
+from utils import encrypt_aes, decrypt_aes
+
+class PaysutraService:
+    def __init__(self):
+        self.base_url = Config.PAYSUTRA_BASE_URL
+        self.merchant_id = Config.PAYSUTRA_MERCHANT_ID
+        self.password = Config.PAYSUTRA_PASSWORD
+        self.auth_key = Config.PAYSUTRA_AUTH_KEY
+        self.module_secret = Config.PAYSUTRA_MODULE_SECRET
+        self.aes_key = Config.PAYSUTRA_AES_KEY
+        self.aes_iv = Config.PAYSUTRA_AES_IV
+        self.token = None
+    
+    def _generate_token(self):
+        """Generate authentication token via login"""
+        try:
+            url = f"{self.base_url}/api/merchant/login"
+            
+            payload = {
+                'merchantId': self.merchant_id,
+                'password': self.password
+            }
+            
+            headers = {
+                'Content-Type': 'application/json'
+            }
+            
+            response = requests.post(url, headers=headers, json=payload, timeout=30)
+            
+            if response.status_code in [200, 201]:
+                data = response.json()
+                if data.get('success'):
+                    self.token = data.get('token')
+                    return {'success': True, 'token': self.token}
+                return {'success': False, 'message': data.get('message', 'Login failed')}
+            else:
+                return {'success': False, 'message': f'Login failed: {response.text}'}
+                
+        except Exception as e:
+            print(f"Paysutra generate token error: {e}")
+            return {'success': False, 'message': f'Token generation error: {str(e)}'}
+            
+    def _get_headers(self):
+        """Get request headers with token and keys"""
+        # Calling login API on every request to avoid 'Token has expired' errors
+        res = self._generate_token()
+        if not res['success']:
+            raise Exception("Failed to acquire token: " + res['message'])
+                
+        return {
+            'Authorization': f'Bearer {self.token}',
+            'X-Authorization-Key': self.auth_key,
+            'X-Module-Secret': self.module_secret,
+            'Content-Type': 'application/json'
+        }
+
+    def generate_txn_id(self, merchant_id, order_id):
+        """Generate unique transaction ID with PSU- prefix"""
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        import random
+        random_suffix = random.randint(1000, 9999)
+        return f"PSU-{timestamp}{random_suffix}"
+
+    def calculate_charges(self, amount, scheme_id, service_type='PAYIN'):
+        """Calculate charges based on scheme"""
+        try:
+            conn = get_db_connection()
+            if not conn:
+                return None, None, None
+            
+            with conn.cursor() as cursor:
+                # Get applicable charge
+                cursor.execute("""
+                    SELECT charge_value, charge_type
+                    FROM commercial_charges
+                    WHERE scheme_id = %s 
+                    AND service_type = %s
+                    AND %s BETWEEN min_amount AND max_amount
+                    ORDER BY min_amount DESC
+                    LIMIT 1
+                """, (scheme_id, service_type, amount))
+                
+                charge_config = cursor.fetchone()
+                
+                if not charge_config:
+                    return 0.00, amount, 'FIXED'
+                
+                charge_type = charge_config['charge_type']
+                charge_value = float(charge_config['charge_value'])
+                
+                if charge_type == 'PERCENTAGE':
+                    charge_amount = (amount * charge_value) / 100
+                else:  # FIXED
+                    charge_amount = charge_value
+                
+                net_amount = amount - charge_amount
+                
+                return round(charge_amount, 2), round(net_amount, 2), charge_type
+                
+        except Exception as e:
+            print(f"Calculate charges error: {e}")
+            return None, None, None
+        finally:
+            if conn:
+                conn.close()
+
+    def create_payin_order(self, merchant_id, order_data):
+        """
+        Create payin order via Paysutra
+        order_data should contain:
+        - amount
+        - orderid
+        - payee_fname
+        - payee_lname
+        - payee_mobile
+        - payee_email
+        """
+        try:
+            conn = get_db_connection()
+            if not conn:
+                return {'success': False, 'message': 'Database connection failed'}
+            
+            with conn.cursor() as cursor:
+                # Get merchant details
+                cursor.execute("""
+                    SELECT merchant_id, full_name, email, scheme_id, is_active
+                    FROM merchants
+                    WHERE merchant_id = %s
+                """, (merchant_id,))
+                
+                merchant = cursor.fetchone()
+                
+                if not merchant:
+                    return {'success': False, 'message': 'Merchant not found'}
+                
+                if not merchant['is_active']:
+                    return {'success': False, 'message': 'Merchant account is inactive'}
+                
+                amount = float(order_data.get('amount', 0))
+                if amount <= 0:
+                    return {'success': False, 'message': 'Invalid amount'}
+                
+                charge_amount, net_amount, charge_type = self.calculate_charges(
+                    amount, merchant['scheme_id']
+                )
+                
+                if charge_amount is None:
+                    return {'success': False, 'message': 'Failed to calculate charges'}
+                
+                # Generate txn ID with prefix 'PSU_'
+                original_orderid = order_data.get('orderid')
+                txn_id = self.generate_txn_id(merchant_id, original_orderid)
+                
+                # We need to pass the callback URL required by Paysutra
+                callback_url = "https://api.pay101.uk/payin/callback/paysutra"
+                
+                # Use float as required by the unencrypted API format
+                display_amount = float(amount)
+                
+                # Payload construction
+                payload_dict = {
+                    "amount": display_amount,
+                    "orderid": txn_id,  # We send our generated txn_id as the orderid to Paysutra to get it back in callback
+                    "payee_fname": order_data.get('payee_fname') or 'User',
+                    "payee_lname": order_data.get('payee_lname') or 'User',
+                    "payee_mobile": order_data.get('payee_mobile') or '9999999999',
+                    "payee_email": order_data.get('payee_email') or 'user@example.com',
+                    "callbackurl": callback_url
+                }
+                
+                try:
+                    headers = self._get_headers()
+                except Exception as e:
+                    return {'success': False, 'message': str(e)}
+                
+                url = f"{self.base_url}/api/payin/order/create"
+                
+                print(f"Creating Paysutra order for {txn_id}...")
+                
+                response = requests.post(
+                    url,
+                    headers=headers,
+                    json=payload_dict,
+                    timeout=30
+                )
+                
+                if response.status_code == 401:
+                    # Token expired, try refreshing
+                    self.token = None
+                    headers = self._get_headers()
+                    response = requests.post(
+                        url,
+                        headers=headers,
+                        json=payload_dict,
+                        timeout=30
+                    )
+                
+                if response.status_code not in [200, 201]:
+                    error_msg = f'Paysutra API error: {response.status_code} - {response.text}'
+                    print(error_msg)
+                    return {'success': False, 'message': f'API Error: {response.status_code} - {response.text}'}
+                
+                try:
+                    paysutra_response = response.json()
+                except Exception as e:
+                    print(f"Failed to decode Paysutra response: {e}. Raw response: {response.text}")
+                    return {'success': False, 'message': 'Failed to decode API response'}
+                    
+                if not paysutra_response.get('success', True) and 'txn_id' not in paysutra_response and 'upi_link' not in paysutra_response:
+                    error_msg = paysutra_response.get('message', 'Order creation failed')
+                    return {'success': False, 'message': error_msg}
+                
+                # Check for error in response
+                if paysutra_response.get('error') or paysutra_response.get('status') == False:
+                    error_msg = paysutra_response.get('message', 'Order creation failed')
+                    return {'success': False, 'message': error_msg}
+                    
+                # Extract response data
+                response_data = paysutra_response.get('data', {})
+                upi_link_val = response_data.get('upi_link') or paysutra_response.get('upi_link') or ''
+                
+                upi_link = upi_link_val
+                qr_string = upi_link_val
+                payment_link = upi_link_val
+                intent_url = upi_link_val
+                
+                # Insert transaction record
+                cursor.execute("""
+                    INSERT INTO payin_transactions (
+                        txn_id, merchant_id, order_id, amount, charge_amount, 
+                        charge_type, net_amount, payee_name, payee_email, 
+                        payee_mobile, product_info, status, pg_partner,
+                        callback_url, created_at
+                    ) VALUES (
+                        %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW()
+                    )
+                """, (
+                    txn_id, merchant_id, original_orderid, amount, 
+                    charge_amount, charge_type, net_amount,
+                    f"{payload_dict['payee_fname']} {payload_dict['payee_lname']}".strip(), 
+                    payload_dict['payee_email'], payload_dict['payee_mobile'], 
+                    order_data.get('productinfo', 'Payment'),
+                    'INITIATED', 'PAYSUTRA',
+                    order_data.get('callbackurl', '')  # Merchant's original callback
+                ))
+                
+                conn.commit()
+                
+                return {
+                    'success': True,
+                    'txn_id': txn_id,
+                    'order_id': original_orderid,
+                    'amount': amount,
+                    'charge_amount': charge_amount,
+                    'net_amount': net_amount,
+                    'qr_string': qr_string,
+                    'upi_link': upi_link,
+                    'payment_link': payment_link,
+                    'intent_url': intent_url
+                }
+                
+        except Exception as e:
+            print(f"Create Paysutra payin order error: {e}")
+            return {'success': False, 'message': f'Internal error: {str(e)}'}
+        finally:
+            if conn:
+                conn.close()
+
+    def generate_payout_txn_id(self, merchant_id, reference_id):
+        """Generate unique transaction ID with PSU-TXN- prefix"""
+        timestamp = datetime.now().strftime('%Y%m%d%H%M%S')
+        import random
+        random_suffix = random.randint(1000, 9999)
+        return f"PSU-TXN-{timestamp}{random_suffix}"
+
+    def initiate_payout(self, merchant_id, payout_data, admin_id=None):
+        """Initiate payout transaction via Paysutra"""
+        try:
+            conn = get_db_connection()
+            if not conn:
+                return {'success': False, 'message': 'Database connection failed'}
+            
+            with conn.cursor() as cursor:
+                is_admin_payout = admin_id is not None or (merchant_id and merchant_id.startswith('ADMIN_'))
+                
+                if is_admin_payout:
+                    charge_amount, net_amount, charge_type = 0.00, float(payout_data['amount']), 'FIXED'
+                    if merchant_id and merchant_id.startswith('ADMIN_'):
+                        admin_id = merchant_id.replace('ADMIN_', '')
+                        merchant_id = None
+                else:
+                    cursor.execute("SELECT scheme_id, is_active FROM merchants WHERE merchant_id = %s", (merchant_id,))
+                    merchant = cursor.fetchone()
+                    
+                    if not merchant:
+                        return {'success': False, 'message': 'Merchant not found'}
+                    if not merchant['is_active']:
+                        return {'success': False, 'message': 'Merchant account is inactive'}
+                    
+                    charge_amount, net_amount, charge_type = self.calculate_charges(
+                        float(payout_data['amount']), merchant['scheme_id'], 'PAYOUT'
+                    )
+                    
+                    if charge_amount is None:
+                        return {'success': False, 'message': 'Unable to calculate charges'}
+                    
+                    total_deduction = float(payout_data['amount']) + float(charge_amount)
+                    
+                    cursor.execute("SELECT COALESCE(settled_balance, balance, 0) as available_balance FROM merchant_wallet WHERE merchant_id = %s", (merchant_id,))
+                    wallet_result = cursor.fetchone()
+                    available_balance = float(wallet_result['available_balance']) if wallet_result else 0.00
+                    
+                    if total_deduction > available_balance:
+                        return {
+                            'success': False,
+                            'message': f'Insufficient balance in wallet, remaining balance: ₹{available_balance:.2f}'
+                        }
+
+                cursor.execute("SELECT txn_id, order_id FROM payout_transactions WHERE reference_id = %s AND pg_partner = 'PAYSUTRA'", (payout_data['reference_id'],))
+                existing = cursor.fetchone()
+                if existing:
+                    txn_id = existing['txn_id']
+                    py_order_id = existing['order_id'] if existing['order_id'] else payout_data['reference_id']
+                else:
+                    txn_id = self.generate_payout_txn_id(merchant_id, payout_data['reference_id'])
+                    
+                    import datetime as dt
+                    py_order_id = f"PY_{int(dt.datetime.now().timestamp()*1000)}"
+
+                    cursor.execute("""
+                        INSERT INTO payout_transactions (
+                            txn_id, merchant_id, admin_id, reference_id, order_id, amount, charge_amount,
+                            charge_type, net_amount, bene_name, bene_email, bene_mobile,
+                            bene_bank, ifsc_code, account_no, payment_type, purpose,
+                            status, pg_partner, callback_url, remarks, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                    """, (
+                        txn_id, merchant_id, admin_id, payout_data['reference_id'], py_order_id,
+                        payout_data['amount'], charge_amount, charge_type, net_amount,
+                        payout_data['bene_name'], payout_data.get('bene_email', ''),
+                        payout_data.get('bene_mobile', ''), payout_data.get('bank_name', ''),
+                        payout_data['bene_ifsc'], payout_data['bene_account'],
+                        payout_data.get('payment_mode', 'IMPS'), payout_data.get('narration', 'Payment'),
+                        'INITIATED', 'PAYSUTRA', payout_data.get('callback_url', ''),
+                        payout_data.get('remarks', '')
+                    ))
+                    conn.commit()
+
+                try:
+                    headers = self._get_headers()
+                except Exception as e:
+                    return {'success': False, 'message': str(e)}
+
+                py_order_id = payout_data.get('reference_id', '')
+                
+                base_url = os.getenv('BACKEND_URL', 'https://api.pay101.uk')
+                callback_url = f"{base_url}/api/callback/paysutra/payout"
+                
+                # IMPORTANT: use Paysutra payout endpoint config if available
+                tpin = Config.PYS_TPIN if hasattr(Config, 'PYS_TPIN') else '1234'
+                
+                payload = {
+                    'order_id': py_order_id,
+                    'amount': float(payout_data['amount']),
+                    'tpin': tpin,
+                    'account_holder_name': payout_data['bene_name'],
+                    'account_number': payout_data['bene_account'],
+                    'ifsc_code': payout_data['bene_ifsc'],
+                    'bank_name': payout_data.get('bank_name', ''),
+                    'payment_type': payout_data.get('payment_mode', 'IMPS'),
+                    'purpose': payout_data.get('narration', 'Payment'),
+                    'bene_email': payout_data.get('bene_email', ''),
+                    'bene_mobile': payout_data.get('bene_mobile', ''),
+                    'callback_url': callback_url
+                }
+
+                url = f"{self.base_url}/api/payout/client/direct-payout"
+                
+                response = requests.post(url, headers=headers, json=payload, timeout=30)
+                
+                if response.status_code not in [200, 201]:
+                    error_msg = f'Paysutra API error: HTTP {response.status_code} - {response.text}'
+                    cursor.execute("UPDATE payout_transactions SET status = 'FAILED', error_message = %s, updated_at = NOW() WHERE txn_id = %s", (error_msg, txn_id))
+                    conn.commit()
+                    return {'success': False, 'message': error_msg}
+                
+                try:
+                    paysutra_response = response.json()
+                except json.JSONDecodeError:
+                    error_msg = 'Paysutra API returned invalid JSON'
+                    cursor.execute("UPDATE payout_transactions SET status = 'FAILED', error_message = %s, updated_at = NOW() WHERE txn_id = %s", (error_msg, txn_id))
+                    conn.commit()
+                    return {'success': False, 'message': error_msg}
+                
+                if not paysutra_response.get('success'):
+                    error_msg = paysutra_response.get('message', 'Payout failed')
+                    cursor.execute("UPDATE payout_transactions SET status = 'FAILED', error_message = %s, updated_at = NOW() WHERE txn_id = %s", (error_msg, txn_id))
+                    conn.commit()
+                    return {'success': False, 'message': error_msg}
+                
+                paysutra_reference_id = paysutra_response.get('reference_id')
+                if not paysutra_reference_id:
+                    paysutra_reference_id = py_order_id
+                
+                paysutra_txn_id = paysutra_response.get('txn_id')
+                status = paysutra_response.get('status', 'PENDING')
+                
+                status_map = {
+                    'SUCCESS': 'SUCCESS', 'PENDING': 'QUEUED', 'FAILED': 'FAILED',
+                    'PROCESSING': 'INPROCESS', 'INITIATED': 'QUEUED', 'QUEUED': 'QUEUED'
+                }
+                mapped_status = status_map.get(status.upper(), 'QUEUED')
+                
+                cursor.execute("""
+                    UPDATE payout_transactions
+                    SET status = %s, pg_txn_id = %s, updated_at = NOW()
+                    WHERE txn_id = %s
+                """, (mapped_status, paysutra_txn_id or paysutra_reference_id, txn_id))
+                conn.commit()
+                
+                return {
+                    'success': True,
+                    'message': 'Payout initiated successfully',
+                    'txn_id': txn_id,
+                    'reference_id': payout_data['reference_id'],
+                    'paysutra_reference_id': paysutra_reference_id,
+                    'paysutra_txn_id': paysutra_txn_id or paysutra_reference_id,
+                    'status': mapped_status,
+                    'amount': payout_data['amount'],
+                    'charge_amount': charge_amount
+                }
+                
+        except Exception as e:
+            print(f"Paysutra payout error: {e}")
+            return {'success': False, 'message': f'Internal error: {str(e)}'}
+        finally:
+            if conn:
+                conn.close()
+
+    def check_payout_status(self, transaction_id=None, order_id=None):
+        try:
+            conn = get_db_connection()
+            if not conn:
+                return {'success': False, 'message': 'Database connection failed'}
+            
+            with conn.cursor() as cursor:
+                if order_id:
+                    cursor.execute("SELECT status, pg_txn_id, bank_ref_no, amount FROM payout_transactions WHERE reference_id = %s AND pg_partner = 'PAYSUTRA'", (order_id,))
+                elif transaction_id:
+                    cursor.execute("SELECT status, pg_txn_id, bank_ref_no, amount, reference_id FROM payout_transactions WHERE pg_txn_id = %s AND pg_partner = 'PAYSUTRA'", (transaction_id,))
+                else:
+                    return {'success': False, 'message': 'Either transaction_id or order_id required'}
+                
+                txn = cursor.fetchone()
+                
+                if not txn:
+                    return {'success': False, 'message': 'Transaction not found'}
+                
+                return {
+                    'success': True,
+                    'status': txn['status'],
+                    'transaction_id': txn['pg_txn_id'],
+                    'order_id': txn.get('reference_id', order_id),
+                    'utr': txn['bank_ref_no'],
+                    'amount': float(txn['amount']),
+                    'message': 'Status retrieved from database'
+                }
+        except Exception as e:
+            return {'success': False, 'message': f'Status check error: {str(e)}'}
+        finally:
+            if conn:
+                conn.close()
+
+paysutra_service = PaysutraService()

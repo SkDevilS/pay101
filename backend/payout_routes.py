@@ -96,6 +96,10 @@ def admin_personal_payout():
                     txn_id = f"PT4_BAR_TXN{uuid.uuid4().hex[:12].upper()}"
                 elif pg_partner_upper in ['PAYTOUCH2', 'PAYTOUCH_GROSMART']:
                     txn_id = f"PT2_GROS_TXN{uuid.uuid4().hex[:12].upper()}"
+                elif pg_partner_upper == 'MONEYONE':
+                    txn_id = f"MO_TXN_{uuid.uuid4().hex[:12].upper()}"
+                elif pg_partner_upper == 'PAYSUTRA':
+                    txn_id = f"PSU_TXN_{uuid.uuid4().hex[:12].upper()}"
                 else:
                     # Default for other gateways (PAYU, MUDRAPE, etc.)
                     txn_id = f"TXN{uuid.uuid4().hex[:16].upper()}"
@@ -456,6 +460,81 @@ def admin_personal_payout():
                             'success': False,
                             'message': result.get('message', 'Payout failed')
                         }), 400
+                
+                elif pg_partner_upper == 'MONEYONE':
+                    from moneyone_service import moneyone_service
+                    payout_data = {
+                        'txn_id': txn_id,
+                        'reference_id': reference_id,
+                        'amount': float(data['amount']),
+                        'bene_name': bank['account_holder_name'],
+                        'bene_account': bank['account_number'],
+                        'bene_ifsc': bank['ifsc_code'],
+                        'bank_name': bank['bank_name']
+                    }
+                    result = moneyone_service.initiate_payout(
+                        merchant_id=None,
+                        payout_data=payout_data,
+                        admin_id=admin_id
+                    )
+                    
+                    if result['success']:
+                        return jsonify({
+                            'success': True,
+                            'message': 'Payout initiated successfully via MoneyOne',
+                            'txn_id': txn_id,
+                            'reference_id': reference_id
+                        }), 200
+                    else:
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = 'FAILED', error_message = %s, completed_at = NOW(), updated_at = NOW()
+                            WHERE reference_id = %s
+                        """, (result.get('message', 'Payout failed'), reference_id))
+                        conn.commit()
+                        
+                        return jsonify({
+                            'success': False,
+                            'message': result.get('message', 'Payout failed')
+                        }), 400
+
+                elif pg_partner_upper == 'PAYSUTRA':
+                    from paysutra_service import paysutra_service
+                    payout_data = {
+                        'txn_id': txn_id,
+                        'reference_id': reference_id,
+                        'amount': float(data['amount']),
+                        'bene_name': bank['account_holder_name'],
+                        'bene_account': bank['account_number'],
+                        'bene_ifsc': bank['ifsc_code'],
+                        'bank_name': bank['bank_name']
+                    }
+                    result = paysutra_service.initiate_payout(
+                        merchant_id=None,
+                        payout_data=payout_data,
+                        admin_id=admin_id
+                    )
+                    
+                    if result['success']:
+                        return jsonify({
+                            'success': True,
+                            'message': 'Payout initiated successfully via Paysutra',
+                            'txn_id': txn_id,
+                            'reference_id': reference_id
+                        }), 200
+                    else:
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = 'FAILED', error_message = %s, completed_at = NOW(), updated_at = NOW()
+                            WHERE reference_id = %s
+                        """, (result.get('message', 'Payout failed'), reference_id))
+                        conn.commit()
+                        
+                        return jsonify({
+                            'success': False,
+                            'message': result.get('message', 'Payout failed')
+                        }), 400
+
                 
                 else:
                     return jsonify({
@@ -968,6 +1047,10 @@ def client_settle_fund():
                     txn_id = f"PT4_BAR_TXN{uuid.uuid4().hex[:12].upper()}"
                 elif pg_partner_upper in ['PAYTOUCH2', 'PAYTOUCH_GROSMART']:
                     txn_id = f"PT2_GROS_TXN{uuid.uuid4().hex[:12].upper()}"
+                elif pg_partner_upper == 'MONEYONE':
+                    txn_id = f"MO_TXN_{uuid.uuid4().hex[:12].upper()}"
+                elif pg_partner_upper == 'PAYSUTRA':
+                    txn_id = f"PSU_TXN_{uuid.uuid4().hex[:12].upper()}"
                 else:
                     # Default for other gateways
                     txn_id = f"TXN{uuid.uuid4().hex[:16].upper()}"
@@ -1453,6 +1536,123 @@ def client_settle_fund():
                             'error': paytouch4_result.get('message')
                         }), 400
                 
+                elif pg_partner_upper == 'MONEYONE':
+                    from moneyone_service import moneyone_service
+                    payout_data = {
+                        'txn_id': txn_id,
+                        'reference_id': reference_id,
+                        'amount': amount_to_bank,
+                        'bene_name': bank['account_holder_name'],
+                        'bene_account': bank['account_number'],
+                        'bene_ifsc': bank['ifsc_code'],
+                        'bank_name': bank['bank_name']
+                    }
+                    result = moneyone_service.initiate_payout(
+                        merchant_id=merchant_id,
+                        payout_data=payout_data,
+                        admin_id=None
+                    )
+                    
+                    if result['success']:
+                        moneyone_txn_id = result.get('moneyone_txn_id', '')
+                        status = result.get('status', 'QUEUED')
+                        
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = %s, pg_txn_id = %s, updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (status, moneyone_txn_id, txn_id))
+                        conn.commit()
+                        
+                        return jsonify({
+                            'success': True,
+                            'message': 'Payout initiated successfully via MoneyOne',
+                            'txn_id': txn_id,
+                            'reference_id': reference_id
+                        }), 200
+                    else:
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = 'FAILED', error_message = %s, completed_at = NOW(), updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (result.get('message', 'Moneyone transfer failed'), txn_id))
+                        conn.commit()
+                        
+                        # Refund the wallet
+                        wallet_service.credit_merchant_wallet(
+                            merchant_id, 
+                            total_wallet_deduction, 
+                            f"Refund for failed payout {txn_id} via Moneyone", 
+                            txn_id,
+                            is_settled=True
+                        )
+                        
+                        return jsonify({
+                            'success': False,
+                            'message': 'Payout failed. Wallet has been refunded.',
+                            'txn_id': txn_id,
+                            'error': result.get('message')
+                        }), 400
+
+                elif pg_partner_upper == 'PAYSUTRA':
+                    from paysutra_service import paysutra_service
+                    payout_data = {
+                        'txn_id': txn_id,
+                        'reference_id': reference_id,
+                        'amount': amount_to_bank,
+                        'bene_name': bank['account_holder_name'],
+                        'bene_account': bank['account_number'],
+                        'bene_ifsc': bank['ifsc_code'],
+                        'bank_name': bank['bank_name']
+                    }
+                    result = paysutra_service.initiate_payout(
+                        merchant_id=merchant_id,
+                        payout_data=payout_data,
+                        admin_id=None
+                    )
+                    
+                    if result['success']:
+                        paysutra_txn_id = result.get('paysutra_txn_id', '')
+                        status = result.get('status', 'QUEUED')
+                        
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = %s, pg_txn_id = %s, updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (status, paysutra_txn_id, txn_id))
+                        conn.commit()
+                        
+                        return jsonify({
+                            'success': True,
+                            'message': 'Payout initiated successfully via Paysutra',
+                            'txn_id': txn_id,
+                            'reference_id': reference_id
+                        }), 200
+                    else:
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = 'FAILED', error_message = %s, completed_at = NOW(), updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (result.get('message', 'Paysutra transfer failed'), txn_id))
+                        conn.commit()
+                        
+                        # Refund the wallet
+                        wallet_service.credit_merchant_wallet(
+                            merchant_id, 
+                            total_wallet_deduction, 
+                            f"Refund for failed payout {txn_id} via Paysutra", 
+                            txn_id,
+                            is_settled=True
+                        )
+                        
+                        return jsonify({
+                            'success': False,
+                            'message': 'Payout failed. Wallet has been refunded.',
+                            'txn_id': txn_id,
+                            'error': result.get('message')
+                        }), 400
+
+                
                 else:
                     # For other gateways, keep as PENDING
                     conn.close()
@@ -1761,6 +1961,10 @@ def client_direct_payout():
                     txn_id = f"PT4_BAR_TXN{uuid.uuid4().hex[:12].upper()}"
                 elif pg_partner_upper in ['PAYTOUCH2', 'PAYTOUCH_GROSMART']:
                     txn_id = f"PT2_GROS_TXN{uuid.uuid4().hex[:12].upper()}"
+                elif pg_partner_upper == 'MONEYONE':
+                    txn_id = f"MO_TXN_{uuid.uuid4().hex[:12].upper()}"
+                elif pg_partner_upper == 'PAYSUTRA':
+                    txn_id = f"PSU_TXN_{uuid.uuid4().hex[:12].upper()}"
                 else:
                     # Default for other gateways
                     txn_id = f"TXN{uuid.uuid4().hex[:16].upper()}"
@@ -2346,6 +2550,134 @@ def client_direct_payout():
                             'message': 'Payout failed. Wallet has been refunded.',
                             'txn_id': txn_id,
                             'error': paytouch4_result.get('message')
+                        }), 400
+
+
+
+                elif pg_partner_upper == 'PAYSUTRA':
+                    from paysutra_service import paysutra_service
+                    payout_data = {
+                        'txn_id': txn_id,
+                        'reference_id': reference_id,
+                        'amount': net_amount_to_bank,
+                        'bene_name': data['account_holder_name'],
+                        'bene_account': data['account_number'],
+                        'bene_ifsc': data['ifsc_code'],
+                        'bank_name': data.get('bank_name', '')
+                    }
+                    result = paysutra_service.initiate_payout(
+                        merchant_id=merchant_id,
+                        payout_data=payout_data,
+                        admin_id=None
+                    )
+                    
+                    if result['success']:
+                        paysutra_txn_id = result.get('paysutra_txn_id', '')
+                        status = result.get('status', 'QUEUED')
+                        
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = %s, pg_txn_id = %s, updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (status, paysutra_txn_id, txn_id))
+                        conn.commit()
+                        
+                        return jsonify({
+                            'success': True,
+                            'message': 'Payout initiated successfully via Paysutra',
+                            'txn_id': txn_id,
+                            'reference_id': reference_id
+                        }), 200
+                    else:
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = 'FAILED', error_message = %s, completed_at = NOW(), updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (result.get('message', 'Paysutra transfer failed'), txn_id))
+                        conn.commit()
+                        
+                        # Refund the wallet
+                        wallet_service.credit_merchant_wallet(
+                            merchant_id, 
+                            total_wallet_deduction, 
+                            f"Refund for failed payout {txn_id} via Paysutra", 
+                            txn_id,
+                            is_settled=True
+                        )
+                        
+                        return jsonify({
+                            'success': False,
+                            'message': 'Payout failed. Wallet has been refunded.',
+                            'txn_id': txn_id,
+                            'error': result.get('message')
+                        }), 400
+
+                elif pg_partner_upper == 'MONEYONE':
+                    from moneyone_service import moneyone_service
+                    payout_data = {
+                        'txn_id': txn_id,
+                        'reference_id': reference_id,
+                        'amount': net_amount_to_bank,
+                        'bene_name': data['account_holder_name'],
+                        'bene_account': data['account_number'],
+                        'bene_ifsc': data['ifsc_code'],
+                        'bank_name': data['bank_name']
+                    }
+                    result = moneyone_service.initiate_payout(
+                        merchant_id=merchant_id,
+                        payout_data=payout_data,
+                        admin_id=None
+                    )
+                    
+                    if result['success']:
+                        status = result.get('status', 'QUEUED')
+                        moneyone_txn_id = result.get('moneyone_txn_id', '')
+                        cursor.execute("""
+                            UPDATE payout_transactions
+                            SET status = %s, pg_txn_id = %s, updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (status, moneyone_txn_id, txn_id))
+                        conn.commit()
+                        conn.close()
+                        return jsonify({
+                            'success': True,
+                            'message': 'Payout initiated successfully. Wallet has been deducted immediately.',
+                            'txn_id': txn_id,
+                            'reference_id': reference_id,
+                            'order_id': data['order_id'],
+                            'requested_amount': amount,
+                            'charges': charges['charge_amount'],
+                            'total_to_deduct': total_deduction,
+                            'amount_to_beneficiary': net_amount_to_bank,
+                            'status': status,
+                            'wallet_balance': wallet_balance_after_deduction,
+                            'note': 'Wallet has been deducted immediately. Will be refunded if payout fails.',
+                            'beneficiary': {
+                                'name': data['account_holder_name'],
+                                'account_number': data['account_number'],
+                                'ifsc_code': data['ifsc_code'],
+                                'bank_name': data['bank_name']
+                            }
+                        }), 200
+                    else:
+                        refund_result = wallet_svc.credit_merchant_wallet(
+                            merchant_id=merchant_id,
+                            amount=total_deduction,
+                            description=f"Payout refund: ₹{amount:.2f} + Charges: ₹{charges['charge_amount']:.2f}",
+                            reference_id=txn_id
+                        )
+                        cursor.execute("""
+                            UPDATE payout_transactions 
+                            SET status = 'FAILED', error_message = %s, completed_at = NOW(), updated_at = NOW()
+                            WHERE txn_id = %s
+                        """, (result.get('message', 'Moneyone transfer failed'), txn_id))
+                        conn.commit()
+                        conn.close()
+                        return jsonify({
+                            'success': False,
+                            'message': 'Payout failed. Wallet has been refunded.',
+                            'txn_id': txn_id,
+                            'error': result.get('message')
                         }), 400
 
                 else:
